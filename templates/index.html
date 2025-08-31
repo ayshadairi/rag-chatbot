@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Chatbot Prototype</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <div class="chat-container">
+            <!-- Header -->
+            <div class="chat-header">
+                <h1>RAG Chatbot Prototype</h1>
+                <p>Ask questions about your documents</p>
+            </div>
+
+            <!-- Upload Section -->
+            <div class="upload-section">
+                <h3>📁 Upload Documents</h3>
+                <form id="upload-form" enctype="multipart/form-data">
+                    <input type="file" id="file-input" name="file" accept=".txt,.pdf,.docx" hidden>
+                    <label for="file-input" class="file-label">
+                        <span>Choose File</span>
+                    </label>
+                    <button type="submit" class="upload-btn">Upload</button>
+                </form>
+                <div id="upload-status"></div>
+            </div>
+
+            <!-- Document Info -->
+            <div class="document-info">
+                Loaded <span id="doc-count">{{ doc_count }}</span> documents • PDF, DOCX, TXT formats supported
+            </div>
+
+            <!-- Chat Messages -->
+            <div class="chat-messages" id="chat-messages">
+                <div class="message bot-message">
+                    Hello! I'm your RAG chatbot assistant. I've processed your documents and I'm ready to answer your questions.
+                    <div class="message-info">RAG Bot • Just now</div>
+                </div>
+            </div>
+
+            <!-- Chat Input -->
+            <div class="chat-input">
+                <input type="text" id="user-input" placeholder="Type your question here..." autocomplete="off">
+                <button id="send-button">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatMessages = document.getElementById('chat-messages');
+            const userInput = document.getElementById('user-input');
+            const sendButton = document.getElementById('send-button');
+            const docCount = document.getElementById('doc-count');
+            const fileInput = document.getElementById('file-input');
+            const uploadForm = document.getElementById('upload-form');
+            const uploadStatus = document.getElementById('upload-status');
+
+            // Focus input on load
+            userInput.focus();
+
+            // File upload functionality
+            uploadForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                if (!fileInput.files[0]) {
+                    showUploadStatus('Please select a file first.', 'error');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+
+                showUploadStatus('Uploading...', 'loading');
+
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showUploadStatus(data.message, 'success');
+                        docCount.textContent = data.new_count;
+                        fileInput.value = ''; // Clear file input
+                    } else {
+                        showUploadStatus(data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    showUploadStatus('Upload failed. Please try again.', 'error');
+                    console.error('Upload error:', error);
+                });
+            });
+
+            function showUploadStatus(message, type) {
+                uploadStatus.textContent = message;
+                uploadStatus.className = `upload-status ${type}`;
+
+                // Clear status after 5 seconds
+                setTimeout(() => {
+                    uploadStatus.textContent = '';
+                    uploadStatus.className = 'upload-status';
+                }, 5000);
+            }
+
+            // Existing chat functionality (keep your existing code here)
+            function sendMessage() {
+                const message = userInput.value.trim();
+                if (message === '') return;
+
+                addMessage(message, 'user');
+                userInput.value = '';
+
+                showTypingIndicator();
+
+                fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({message: message})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    removeTypingIndicator();
+                    if (data.status === 'success') {
+                        addMessage(data.response, 'bot');
+                    } else {
+                        addMessage("Sorry, I encountered an error.", 'bot');
+                    }
+                })
+                .catch(error => {
+                    removeTypingIndicator();
+                    addMessage("Sorry, I couldn't connect to the server.", 'bot');
+                    console.error('Error:', error);
+                });
+            }
+
+            // Add message to chat
+            function addMessage(text, sender) {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message');
+                messageElement.classList.add(sender + '-message');
+
+                const messageText = document.createElement('div');
+                messageText.textContent = text;
+
+                const messageInfo = document.createElement('div');
+                messageInfo.classList.add('message-info');
+
+                // Get current time
+                const now = new Date();
+                const timeString = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                messageInfo.textContent = sender === 'user' ? `You • ${timeString}` : `RAG Bot • ${timeString}`;
+
+                messageElement.appendChild(messageText);
+                messageElement.appendChild(messageInfo);
+
+                chatMessages.appendChild(messageElement);
+
+                // Scroll to bottom
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            // Show typing indicator
+            function showTypingIndicator() {
+                const typingElement = document.createElement('div');
+                typingElement.classList.add('typing-indicator');
+                typingElement.id = 'typing-indicator';
+
+                for (let i = 0; i < 3; i++) {
+                    const dot = document.createElement('div');
+                    dot.classList.add('typing-dot');
+                    typingElement.appendChild(dot);
+                }
+
+                chatMessages.appendChild(typingElement);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            // Remove typing indicator
+            function removeTypingIndicator() {
+                const typingElement = document.getElementById('typing-indicator');
+                if (typingElement) {
+                    typingElement.remove();
+                }
+            }
+
+            // Event listeners
+            sendButton.addEventListener('click', sendMessage);
+
+            userInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
