@@ -9,19 +9,13 @@ class GeminiChat:
         self.processor = DocumentProcessor()
         self.processor.load_documents(document_folder)
 
-        # Configure Gemini - Use free API key
+        # Configure Gemini
         if api_key:
             genai.configure(api_key=api_key)
         else:
-            # Try to get from environment variable
             genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
 
-        # Initialize the model
         self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
-        self.conversation_history = []
-
-        print("✅ Gemini AI model loaded successfully!")
-        print(f"✅ Loaded {len(self.processor.documents)} documents")
 
     def generate_response(self, query):
         try:

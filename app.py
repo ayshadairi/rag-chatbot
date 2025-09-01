@@ -1,7 +1,7 @@
-from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
+from flask import Flask, render_template, request, jsonify
+from werkzeug.utils import secure_filename
 from gemini_chat import GeminiChat
 import os
-from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'documents'
